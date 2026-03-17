@@ -5,23 +5,34 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --watch src --ext ts --exec \"npx tsc && node dist/index.js\""
+    "dev": "nodemon --watch src --ext ts --exec \"npx tsc && node dist/index.js\"",
+    "web": "npx tsc && node dist/web/server.js",
+    "start-all": "npm-run-all --parallel dev web"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "body-parser": "^2.2.2",
     "discord.js": "^14.25.1",
     "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "multer": "^2.1.1",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@types/body-parser": "^1.19.6",
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.18.2",
+    "@types/multer": "^2.1.0",
     "@types/node": "^25.5.0",
     "nodemon": "^3.1.14",
+    "npm-run-all": "^4.1.5",
     "ts-node-dev": "^2.0.0"
   }
 }
