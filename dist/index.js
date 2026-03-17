@@ -1,4 +1,5 @@
 import './webhook.js';
+// @ts-ignore
 import settings from './settings.js';
 import fs from 'fs';
 import 'dotenv/config';
@@ -37,7 +38,7 @@ async function startBot() {
         console.log('Migration des guid et id_media terminée.');
         // Initialisation du bot Discord
         const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
-        client.once('clientReady', () => {
+        client.once('ready', () => {
             console.log(`Bot connecté en tant que ${client.user?.tag}`);
         });
         // Gestion des erreurs Discord
@@ -53,8 +54,8 @@ async function startBot() {
                 console.log(`Ajouté au serveur : ${guild.name}`);
                 // Récupération des membres
                 const members = await guild.members.fetch();
-                // Stockage des infos serveur
-                await db.run('INSERT OR IGNORE INTO servers (id, name) VALUES (?, ?)', guild.id, guild.name);
+                // Stockage des infos serveur (uuid inconnu à ce stade)
+                await db.run('INSERT OR IGNORE INTO servers (id, name, uuid) VALUES (?, ?, ?)', guild.id, guild.name, null);
                 // Stockage des utilisateurs
                 for (const member of members.values()) {
                     if (!member.user.bot) {
@@ -68,7 +69,7 @@ async function startBot() {
             }
         });
         // Au démarrage, mémorise tous les serveurs et utilisateurs
-        client.on('clientReady', async () => {
+        client.on('ready', async () => {
             try {
                 for (const guild of client.guilds.cache.values()) {
                     console.log(`Synchronisation du serveur : ${guild.name}`);
@@ -112,54 +113,47 @@ async function startBot() {
                 console.error('Erreur lors de la synchronisation au démarrage :', err);
                 console.warn(`Raisons possibles :\n- Intent SERVER MEMBERS non activé\n- Permissions insuffisantes\n- Problème Discord API\n- Serveur trop grand ou bot trop récent`);
             }
-        });
-        await client.login(process.env.DISCORD_TOKEN);
-        // Après connexion, traite les notifications en attente
-        const { processPendingNotifications, getLocalImagePath, insertImage, createImagesTable } = await import('./db.js');
-        await createImagesTable(db);
-        async function downloadImageIfNeeded(plexUrl) {
-            if (!plexUrl)
+        }); // <-- fermeture correcte du listener 'ready'
+        // Connexion du bot Discord
+        await client.login(process.env.DISCORD_TOKEN || process.env.BOT_TOKEN);
+        // Fonction utilitaire pour télécharger une image si besoin (stockage local)
+        async function downloadImageIfNeeded(imageUrl) {
+            // Remplacement des require par import ES
+            const path = await import('path');
+            const fs = await import('fs');
+            const axiosModule = await import('axios');
+            const axios = axiosModule.default || axiosModule;
+            const crypto = await import('crypto');
+            if (!imageUrl)
                 return null;
-            if (!process.env.PLEX_TOKEN) {
-                console.error('Impossible de télécharger l’image Plex : le token PLEX_TOKEN est manquant.');
-                return null;
-            }
-            // Vérifie si déjà présente
-            let localPath = await getLocalImagePath(db, plexUrl);
-            if (localPath)
+            // Génère un nom de fichier unique basé sur l'URL
+            const hash = crypto.createHash('md5').update(imageUrl).digest('hex');
+            const urlPart = typeof imageUrl === 'string' ? imageUrl.split('?')[0] : '';
+            let ext = typeof urlPart === 'string' ? path.extname(urlPart) : '.jpg';
+            if (!ext || ext === '')
+                ext = '.jpg';
+            const localPath = `images/${hash}${ext}`;
+            console.log('[DEBUG] Chemin local image généré :', localPath);
+            if (fs.existsSync(localPath))
                 return localPath;
-            // Télécharge l'image depuis Plex (IP locale)
-            const plexLocalUrl = plexUrl.replace('https://plex.jon-dev.fr', settings.PLEX_LOCAL_URL);
-            // Extension : extraite depuis l'URL ou par défaut jpg
-            let ext = 'jpg';
-            const urlParts = plexUrl.split('.');
-            if (urlParts.length > 1) {
-                const extCandidate = urlParts[urlParts.length - 1]?.split('?')[0];
-                if (extCandidate && extCandidate.length <= 5 && !extCandidate.includes('/')) {
-                    ext = extCandidate;
-                }
-            }
-            const fileName = `img_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
-            const destPath = `images/${fileName}`;
             try {
-                const res = await fetch(plexLocalUrl, { headers: { 'X-Plex-Token': process.env.PLEX_TOKEN || '' } });
-                if (!res.ok)
-                    throw new Error('HTTP ' + res.status);
-                const arrayBuffer = await res.arrayBuffer();
-                const buffer = Buffer.from(arrayBuffer);
-                fs.writeFileSync(destPath, buffer);
-                await insertImage(db, plexUrl, destPath);
-                return destPath;
+                const response = await axios.get(imageUrl, { responseType: 'arraybuffer', headers: process.env.PLEX_TOKEN ? { 'X-Plex-Token': process.env.PLEX_TOKEN } : {} });
+                fs.writeFileSync(localPath, response.data);
+                return localPath;
             }
-            catch (e) {
-                console.error('Erreur téléchargement image Plex', plexLocalUrl, e);
+            catch (err) {
+                console.error('Erreur lors du téléchargement de l\'image Plex :', imageUrl, err);
                 return null;
             }
         }
+        // Fonction d'envoi de notification Discord
         async function sendNotification(userId, notification) {
             try {
-                console.log('Tentative d\'envoi de notification à', userId, notification?.Metadata?.title || notification?.event || 'Contenu');
-                const user = await client.users.fetch(userId);
+                console.log('[DEBUG] Tentative d\'envoi de notification à', userId, notification?.Metadata?.title || notification?.event || 'Contenu');
+                const user = await client.users.fetch(userId).catch(err => {
+                    console.error(`[DEBUG] Impossible de fetch l'utilisateur Discord ${userId} :`, err);
+                    return null;
+                });
                 if (user) {
                     // Détermination du type et couleur
                     const type = notification.Metadata?.librarySectionType || notification.Metadata?.type || '';
@@ -190,9 +184,22 @@ async function startBot() {
                     if (localImagePath) {
                         imageEmbedUrl = `${settings.BOT_SERVER_URL}/${localImagePath.replace('images/', 'images/')}`;
                     }
+                    console.log('[DEBUG] URL d\'image utilisée dans l\'embed :', imageEmbedUrl);
                     // Embed Discord simplifié
+                    // Construction du titre
+                    let embedTitle = 'QUOI DE NEUF SUR PLEX - ';
+                    if (type === 'show' || type === 'episode' || type === 'series') {
+                        // Nom du show + titre de l'épisode
+                        const showName = notification.Metadata?.grandparentTitle || notification.Metadata?.parentTitle || '';
+                        const episodeTitle = notification.Metadata?.title || '';
+                        embedTitle += showName ? `${showName} - ` : '';
+                        embedTitle += episodeTitle;
+                    }
+                    else {
+                        embedTitle += notification.Metadata?.title || 'Nouveau contenu Plex';
+                    }
                     const embed = {
-                        title: notification.Metadata?.title || 'Nouveau contenu Plex',
+                        title: embedTitle,
                         description: notification.Metadata?.summary || '',
                         color: color,
                         fields: [
@@ -201,24 +208,38 @@ async function startBot() {
                         timestamp: new Date().toISOString(),
                         ...(imageEmbedUrl ? { image: { url: imageEmbedUrl } } : {})
                     };
-                    await user.send({ embeds: [embed] });
-                    console.log('Notification envoyée à', userId);
+                    try {
+                        await user.send({ embeds: [embed] });
+                        console.log('[DEBUG] Notification envoyée à', userId);
+                    }
+                    catch (sendErr) {
+                        console.error(`[DEBUG] Erreur lors de l'envoi du DM à l'utilisateur ${userId} :`, sendErr);
+                    }
                 }
                 else {
-                    console.warn('Utilisateur non trouvé pour l\'envoi de notification :', userId);
+                    console.warn('[DEBUG] Utilisateur non trouvé pour l\'envoi de notification :', userId);
                 }
             }
             catch (e) {
-                console.error('Erreur lors de l\'envoi de la notification à', userId, e);
+                let errMsg = '';
+                if (e && typeof e.toString === 'function') {
+                    errMsg += '[toString] ' + e.toString() + ' ';
+                }
+                errMsg += '[typeof] ' + typeof e + ' ';
+                errMsg += '[json] ' + JSON.stringify(e);
+                console.error('[DEBUG] Erreur inattendue lors de l\'envoi de la notification à', userId, errMsg);
             }
         }
+        // Import de processPendingNotifications depuis db.js
+        const { processPendingNotifications } = await import('./db.js');
         // Lancer le traitement toutes les 60 secondes
         setInterval(() => processPendingNotifications(db, sendNotification), 60000);
         // Lancer une fois au démarrage
         processPendingNotifications(db, sendNotification);
     }
     catch (err) {
-        console.error('Erreur lors du démarrage du bot :', err);
+        console.error('Erreur lors de la synchronisation au démarrage :', err);
+        console.warn(`Raisons possibles :\n- Intent SERVER MEMBERS non activé\n- Permissions insuffisantes\n- Problème Discord API\n- Serveur trop grand ou bot trop récent`);
     }
 }
 startBot();

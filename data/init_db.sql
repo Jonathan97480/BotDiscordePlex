@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS servers (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
+    uuid TEXT,
     date_added DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -62,15 +63,8 @@ CREATE TABLE IF NOT EXISTS pending_notifications (
     is_send BOOLEAN NOT NULL DEFAULT 0,
     guid TEXT,
     id_media TEXT
--- Ajout du champ id_media à la table notifications
-ALTER TABLE notifications ADD COLUMN id_media TEXT;
-
--- Ajout du champ id_media à la table pending_notifications
-ALTER TABLE pending_notifications ADD COLUMN id_media TEXT;
 );
 
--- Ajout du champ guid à la table notifications
-ALTER TABLE notifications ADD COLUMN guid TEXT;
 
--- Ajout du champ guid à la table pending_notifications
-ALTER TABLE pending_notifications ADD COLUMN guid TEXT;
+
+

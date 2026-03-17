@@ -31,10 +31,13 @@ app.post('/plex', upload.any(), async (req, res) => {
         const db = await initDatabase();
         await insertPendingNotification(db, data);
 
-        // Vérification utilisateur à notifier
+        // Nouvelle logique : on ne vérifie que l'utilisateur dans la liste à notifier, plus de UUID
         let notify = true;
-        if (data.Account && data.Server) {
-            notify = await shouldNotifyUser(db, data.Server.uuid, String(data.Account.id));
+        let userId = data.Account?.id ? String(data.Account.id) : null;
+        let serverId = data.Server?.id ? String(data.Server.id) : null;
+        console.log('[DEBUG webhook] Vérification userId:', userId, 'serverId:', serverId);
+        if (userId && serverId) {
+            notify = await shouldNotifyUser(db, serverId, userId);
         }
         if (!notify) {
             console.log('Utilisateur non inscrit pour recevoir les notifications, rien envoyé.');

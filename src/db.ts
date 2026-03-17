@@ -23,6 +23,13 @@ export async function processPendingNotifications(db: Database, sendNotification
     // Récupère toutes les notifications non envoyées
     const pendings = await db.all('SELECT * FROM pending_notifications WHERE is_send = 0');
     console.log(`[processPendingNotifications] ${pendings.length} notifications en attente.`);
+    // On suppose un seul serveur Discord, on prend le premier (ou unique) serveur
+    const serverRow = await db.get('SELECT id FROM servers LIMIT 1');
+    const discordServerId = serverRow ? serverRow.id : null;
+    if (!discordServerId) {
+        console.warn('[processPendingNotifications] Aucun serveur Discord trouvé dans la base.');
+        return;
+    }
     for (const pending of pendings) {
         let data;
         try {
@@ -31,26 +38,11 @@ export async function processPendingNotifications(db: Database, sendNotification
             console.error('[processPendingNotifications] Erreur de parsing JSON pour la notification id', pending.id, e);
             continue;
         }
-        const plexUuid = data.Server && data.Server.uuid ? data.Server.uuid : null;
-        if (!plexUuid) {
-            console.warn('[processPendingNotifications] Notification id', pending.id, 'sans serverId (UUID Plex), ignorée.');
-            continue;
-        }
-        // Trouver l'id Discord du serveur correspondant à l'UUID Plex
-        const serverRow = await db.get('SELECT id FROM servers WHERE uuid = ? OR id = ?', plexUuid, plexUuid);
-        const discordServerId = serverRow ? serverRow.id : null;
-        if (!discordServerId) {
-            console.warn(`[processPendingNotifications] Notification id ${pending.id} : aucun serveur Discord trouvé pour l'UUID Plex ${plexUuid}`);
-            continue;
-        }
         const users = await db.all('SELECT user_id FROM list_users_a_notifier WHERE server_id = ?', discordServerId);
-        console.log(`[processPendingNotifications] Notification id ${pending.id} pour serveur Discord ${discordServerId} (UUID Plex ${plexUuid}) : ${users.length} utilisateur(s) à notifier.`);
         for (const u of users) {
-            console.log(`[processPendingNotifications] Envoi à user_id ${u.user_id}`);
             await sendNotification(u.user_id, data);
         }
         await db.run('UPDATE pending_notifications SET is_send = 1 WHERE id = ?', pending.id);
-        console.log(`[processPendingNotifications] Notification id ${pending.id} marquée comme envoyée.`);
     }
 }
 // Gestion de la liste des utilisateurs à notifier
