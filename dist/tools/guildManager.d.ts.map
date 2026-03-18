@@ -1,0 +1,1 @@
+{"version":3,"file":"guildManager.d.ts","sourceRoot":"","sources":["../../src/tools/guildManager.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,KAAK,EAAE,MAAM,YAAY,CAAC;AAExC,iBAAe,yCAAyC,CAAC,KAAK,EAAE,KAAK,EAAE,EAAE,EAAE,GAAG,iBAiB7E;AAGD,iBAAe,+BAA+B,CAAC,MAAM,EAAE,GAAG,EAAE,EAAE,EAAE,GAAG,iBA6ClE;AAED,OAAO,EAAE,yCAAyC,EAAE,+BAA+B,EAAE,CAAC"}

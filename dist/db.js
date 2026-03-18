@@ -38,10 +38,22 @@ export async function processPendingNotifications(db, sendNotification) {
             continue;
         }
         const users = await db.all('SELECT user_id FROM list_users_a_notifier WHERE server_id = ?', discordServerId);
+        let allOk = true;
         for (const u of users) {
-            await sendNotification(u.user_id, data);
+            try {
+                await sendNotification(u.user_id, data);
+            }
+            catch (err) {
+                allOk = false;
+                console.error(`[processPendingNotifications] Échec d'envoi à l'utilisateur ${u.user_id} pour la notification id ${pending.id} :`, err);
+            }
         }
-        await db.run('UPDATE pending_notifications SET is_send = 1 WHERE id = ?', pending.id);
+        if (allOk) {
+            await db.run('UPDATE pending_notifications SET is_send = 1 WHERE id = ?', pending.id);
+        }
+        else {
+            console.warn(`[processPendingNotifications] Notification id ${pending.id} : tous les utilisateurs n'ont pas été notifiés, is_send reste à 0.`);
+        }
     }
 }
 // Gestion de la liste des utilisateurs à notifier

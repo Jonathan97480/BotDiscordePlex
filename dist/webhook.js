@@ -26,7 +26,32 @@ app.post('/plex', upload.any(), async (req, res) => {
     console.log('Webhook Plex reçu :', data);
     try {
         const db = await initDatabase();
-        await insertPendingNotification(db, data);
+        // Gestion des ajouts multiples d'épisodes
+        if (data.Metadata && (Array.isArray(data.Metadata.children) || Array.isArray(data.Metadata.leaves))) {
+            const episodes = data.Metadata.children || data.Metadata.leaves;
+            if (Array.isArray(episodes)) {
+                for (const ep of episodes) {
+                    const notifData = { ...data, Metadata: ep };
+                    await insertPendingNotification(db, notifData);
+                }
+                console.log(`[DEBUG webhook] Ajout multiple : ${episodes.length} épisodes insérés dans la file de notifications.`);
+            }
+        }
+        else if (data.event === 'library.new' && data.Metadata && data.Metadata.type === 'show') {
+            // Cas spécial : ajout d'une série, on notifie avec un titre spécial
+            const notifData = {
+                ...data,
+                Metadata: {
+                    ...data.Metadata,
+                    title: `${data.Metadata.title} — Nouveaux épisodes disponibles !`
+                }
+            };
+            await insertPendingNotification(db, notifData);
+            console.log(`[DEBUG webhook] Notification ajout série : ${notifData.Metadata.title}`);
+        }
+        else {
+            await insertPendingNotification(db, data);
+        }
         // Nouvelle logique : on ne vérifie que l'utilisateur dans la liste à notifier, plus de UUID
         let notify = true;
         let userId = data.Account?.id ? String(data.Account.id) : null;
