@@ -15,4 +15,11 @@ if [ ! -f src/settings.js ]; then
 fi
 
 npm install
+echo "Compilation TypeScript..."
+npx tsc
+if [ $? -ne 0 ]; then
+  echo "Erreur de compilation TypeScript."
+  exit 1
+fi
+echo "Lancement du bot Discord Plex..."
 npm run start-all

@@ -1,5 +1,101 @@
 # Bot Discord Plex
 
+## Guide de déploiement Docker (FR)
+
+### Prérequis
+- Docker installé
+- Un fichier `.env` avec vos tokens Discord et Plex
+- Un fichier `src/settings.js` adapté à votre configuration
+
+### Construction de l'image
+```bash
+docker build -t bot-discorde-plex .
+```
+
+### Lancement du conteneur (redémarrage automatique)
+```bash
+docker run -d --restart unless-stopped \
+  -p 3000:3000 -p 4000:4000 \
+  --env-file /chemin/vers/.env \
+  -v /chemin/vers/settings.js:/app/src/settings.js \
+  bot-discorde-plex
+```
+
+- Le port 3000 sert le webhook Plex et les images.
+- Le port 4000 sert l’interface web.
+- Modifiez `.env` et `settings.js` sur l’hôte pour adapter la configuration.
+
+### Conseils
+- Ne jamais commiter vos clés dans le dépôt.
+- Utilisez l’option `--restart unless-stopped` pour la résilience.
+- Vérifiez l’accessibilité du port 3000 pour les images Discord.
+
+---
+
+## Variables d’environnement (.env)
+```
+DISCORD_TOKEN=VotreTokenDiscord
+PLEX_TOKEN=VotreTokenPlex
+```
+
+## settings.js
+```
+module.exports = {
+  botServerUrl: 'http://localhost:3000',
+  plexLocalUrl: 'http://localhost:32400'
+};
+```
+
+---
+
+## Docker deployment guide (EN)
+
+### Prerequisites
+- Docker installed
+- A `.env` file with your Discord and Plex tokens
+- A `src/settings.js` file adapted to your configuration
+
+### Build the image
+```bash
+docker build -t bot-discorde-plex .
+```
+
+### Run the container (auto-restart)
+```bash
+docker run -d --restart unless-stopped \
+  -p 3000:3000 -p 4000:4000 \
+  --env-file /path/to/.env \
+  -v /path/to/settings.js:/app/src/settings.js \
+  bot-discorde-plex
+```
+
+- Port 3000 serves the Plex webhook and images.
+- Port 4000 serves the web interface.
+- Edit `.env` and `settings.js` on the host to adapt the configuration.
+
+### Tips
+- Never commit your keys to the repository.
+- Use `--restart unless-stopped` for resilience.
+- Check port 3000 accessibility for Discord images.
+
+---
+
+## Environment variables (.env)
+```
+DISCORD_TOKEN=YourDiscordToken
+PLEX_TOKEN=YourPlexToken
+```
+
+## settings.js
+```
+module.exports = {
+  botServerUrl: 'http://localhost:3000',
+  plexLocalUrl: 'http://localhost:32400'
+};
+```
+
+---
+
 ## Description
 Bot Discord Plex est un bot écrit en TypeScript permettant d'envoyer des notifications sur Discord concernant les nouveautés ajoutées sur un serveur Plex. Il peut notifier des utilisateurs spécifiques ou des salons, et gère une base de données SQLite pour stocker les informations nécessaires.
 
