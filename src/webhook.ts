@@ -2,6 +2,7 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import multer from 'multer';
 import { initDatabase, insertPendingNotification, insertShowIfNotExists, shouldNotifyUser } from './db.js';
+import { parsePlexPayload, isDuplicateNotification, buildNotificationData } from './tools/webhookUtils.js';
 
 const app = express();
 // Sert les images locales en HTTP
@@ -16,16 +17,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const upload = multer();
 
 // Route pour recevoir les webhooks Plex
+
 app.post('/plex', upload.any(), async (req, res) => {
-    let data = req.body;
-    if (data && typeof data.payload === 'string') {
-        try {
-            data = JSON.parse(data.payload);
-        } catch (e) {
-            // ignore
-        }
-    }
+    let data = parsePlexPayload(req.body);
     console.log('Webhook Plex reçu :', data);
+
 
     try {
         const db = await initDatabase();
@@ -35,20 +31,14 @@ app.post('/plex', upload.any(), async (req, res) => {
             const episodes = data.Metadata.children || data.Metadata.leaves;
             if (Array.isArray(episodes)) {
                 for (const ep of episodes) {
-                    const notifData = { ...data, Metadata: ep };
+                    const notifData = buildNotificationData(data, ep);
                     await insertPendingNotification(db, notifData);
                 }
                 console.log(`[DEBUG webhook] Ajout multiple : ${episodes.length} épisodes insérés dans la file de notifications.`);
             }
         } else if (data.event === 'library.new' && data.Metadata && data.Metadata.type === 'show') {
             // Cas spécial : ajout d'une série, on notifie avec un titre spécial
-            const notifData = {
-                ...data,
-                Metadata: {
-                    ...data.Metadata,
-                    title: `${data.Metadata.title} — Nouveaux épisodes disponibles !`
-                }
-            };
+            const notifData = buildNotificationData(data, { title: `${data.Metadata.title} — Nouveaux épisodes disponibles !` });
             await insertPendingNotification(db, notifData);
             console.log(`[DEBUG webhook] Notification ajout série : ${notifData.Metadata.title}`);
         } else {
@@ -74,12 +64,8 @@ app.post('/plex', upload.any(), async (req, res) => {
             await insertShowIfNotExists(db, data.Metadata);
         } else if (data.Metadata) {
             // Pour tout autre type (épisode, film, etc.), on sauvegarde sans filtre mais on évite les doublons sur id_media
-            const id_media = data.Metadata.ratingKey ? String(data.Metadata.ratingKey) : null;
-            let exists = false;
-            if (id_media) {
-                const row = await db.get('SELECT id FROM notifications WHERE id_media = ?', id_media);
-                exists = !!row;
-            }
+            const id_media = data.Metadata.ratingKey ? String(data.Metadata.ratingKey) : '';
+            const exists = await isDuplicateNotification(db, id_media);
             if (!exists) {
                 await db.run(
                     'INSERT INTO notifications (title, synopsis, cover_url, trailer_url, type, guid, id_media) VALUES (?, ?, ?, ?, ?, ?, ?)',
