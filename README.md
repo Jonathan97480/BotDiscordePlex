@@ -137,11 +137,30 @@ Bot Discord Plex est un bot écrit en TypeScript permettant d'envoyer des notifi
 3. Configurer le fichier `.env` avec votre token Discord et autres variables nécessaires.
 4. Initialiser la base SQLite avec le script `data/init_db.sql`.
 
+
 ## Lancement
-Pour démarrer le bot :
+Pour démarrer le bot et le serveur webhook (mode développement) :
 ```bash
-npm run start
+npm run build
+npm run start-all
 ```
+
+---
+
+## Tests unitaires
+Des tests Jest sont présents dans le dossier `tests/`.
+
+Pour lancer les tests :
+```bash
+npm test
+```
+
+---
+
+## Contribution
+1. Forkez le dépôt et créez une branche dédiée (`update`, `feature/xxx`, etc.).
+2. Vérifiez que les tests passent (`npm test`).
+3. Proposez une pull request claire et documentée.
 
 ## Technologies utilisées
 - TypeScript
