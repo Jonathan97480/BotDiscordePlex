@@ -4,10 +4,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --watch src --ext ts --exec \"npx tsc && node dist/index.js\"",
-    "web": "npx tsc && node dist/web/server.js",
-    "start-all": "npm-run-all --parallel dev web"
+    "build": "tsc",
+    "start-all": "npm-run-all --parallel dev web",
+    "dev": "node dist/index.js",
+    "web": "node dist/webhook.js",
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
@@ -31,10 +32,13 @@
     "@types/body-parser": "^1.19.6",
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.18.2",
+    "@types/jest": "^29.5.11",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.5.0",
+    "jest": "^29.7.0",
     "nodemon": "^3.1.14",
     "npm-run-all": "^4.1.5",
+    "ts-jest": "^29.1.1",
     "ts-node-dev": "^2.0.0"
   }
 }
